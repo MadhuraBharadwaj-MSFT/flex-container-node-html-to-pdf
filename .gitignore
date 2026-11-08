@@ -1,0 +1,7 @@
+node_modules/
+local.settings.json
+coverage/
+*.pdf
+npm-debug.log*
+.env
+.DS_Store

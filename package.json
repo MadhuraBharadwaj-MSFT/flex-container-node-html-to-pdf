@@ -1,0 +1,20 @@
+{
+  "name": "flex-byoc-node-html-to-pdf",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Azure Functions Flex Consumption BYOC sample that renders HTML to PDF with Puppeteer Core and OS-installed Chromium.",
+  "license": "MIT",
+  "main": "src/functions/htmlToPdf.js",
+  "engines": {
+    "node": ">=24 <25"
+  },
+  "scripts": {
+    "start": "func start",
+    "test": "node --test",
+    "test:coverage": "node --test --experimental-test-coverage"
+  },
+  "dependencies": {
+    "@azure/functions": "4.17.0",
+    "puppeteer-core": "25.16.0"
+  }
+}

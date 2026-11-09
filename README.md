@@ -23,7 +23,7 @@ being used in `Content-Disposition`.
 ## Verified versions
 
 - Node.js `24.22.2`
-- Azure Functions Node worker `3.17.1`
+- Azure Functions Node worker `3.17.3`
 - `@azure/functions` `4.17.0`
 - `puppeteer-core` `25.16.0`
 - Debian Chromium `156.0.8078.79`
@@ -31,19 +31,15 @@ being used in `Content-Disposition`.
 The worker archive is checksum-pinned:
 
 ```text
-424407adbde0d2ad922cb1116bb4e70de551c6744e3d01ec72542633f5db33c2
+93fbe6f007a5eab62f28e30b3fbb93c61c53ba3b9890cc135d982a8af1e4f3ca
 ```
 
-## BYOC application-directory requirement
+## BYOC application directory
 
-The worker image uses `/home/site/wwwroot` and explicitly sets:
-
-```dockerfile
-ENV FUNCTIONS_APPLICATION_DIRECTORY=/home/site/wwwroot
-```
-
-Without this setting, the preview platform can report `AppDirectoryNotSet`,
-prevent Host configuration delivery and function indexing.
+Worker `3.17.3` consumes the application directory supplied by the preview
+Host/WorkerProxy contract. The image uses `/home/site/wwwroot` as its working
+directory and does not set `FUNCTIONS_APPLICATION_DIRECTORY` or
+`AzureWebJobsScriptRoot`.
 
 ## Rendering controls
 

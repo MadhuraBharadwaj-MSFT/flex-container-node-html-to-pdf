@@ -1,7 +1,7 @@
 FROM node:24-bookworm-slim AS worker
 
-ADD --checksum=sha256:424407adbde0d2ad922cb1116bb4e70de551c6744e3d01ec72542633f5db33c2 \
-    https://github.com/Azure/azure-functions-nodejs-worker/releases/download/v3.17.1/azure-functions-nodejs-worker-3.17.1.tar.gz \
+ADD --checksum=sha256:93fbe6f007a5eab62f28e30b3fbb93c61c53ba3b9890cc135d982a8af1e4f3ca \
+    https://github.com/Azure/azure-functions-nodejs-worker/releases/download/v3.17.3/azure-functions-nodejs-worker-3.17.3.tar.gz \
     /tmp/worker.tar.gz
 
 RUN mkdir -p /opt/functions-worker \
@@ -29,7 +29,6 @@ RUN apt-get update \
     && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /home/site/wwwroot
-ENV FUNCTIONS_APPLICATION_DIRECTORY=/home/site/wwwroot
 ENV CHROMIUM_EXECUTABLE=/usr/bin/chromium
 ENV PUPPETEER_SKIP_DOWNLOAD=true
 COPY --from=worker /opt/functions-worker/ /opt/functions-worker/

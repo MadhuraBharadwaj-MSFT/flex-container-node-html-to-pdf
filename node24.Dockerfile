@@ -1,5 +1,3 @@
-# syntax=docker/dockerfile:1.7
-
 FROM node:24-bookworm-slim AS worker
 
 ADD --checksum=sha256:424407adbde0d2ad922cb1116bb4e70de551c6744e3d01ec72542633f5db33c2 \
@@ -12,17 +10,10 @@ RUN mkdir -p /opt/functions-worker \
 
 FROM node:24-bookworm-slim AS dependencies
 
-ARG NPM_REGISTRY=https://registry.npmjs.org/
+ARG NPM_REGISTRY=https://pkgs.dev.azure.com/azfunc/public/_packaging/upstream-public/npm/registry/
 WORKDIR /app
 COPY package.json package-lock.json ./
-RUN --mount=type=secret,id=npmrc,target=/root/.npmrc \
-    npm ci \
-        --omit=dev \
-        --ignore-scripts \
-        --registry "$NPM_REGISTRY" \
-        --replace-registry-host=always \
-        --no-audit \
-        --no-fund
+RUN npm ci --omit=dev --ignore-scripts --registry "$NPM_REGISTRY" --no-audit --no-fund
 
 FROM node:24-bookworm-slim
 
@@ -30,21 +21,21 @@ RUN apt-get update \
     && apt-get install -y --no-install-recommends \
         ca-certificates \
         chromium \
-        fontconfig \
+        chromium-sandbox \
+        fonts-dejavu-core \
         fonts-liberation \
-        fonts-noto-cjk \
         fonts-noto-color-emoji \
         fonts-noto-core \
     && rm -rf /var/lib/apt/lists/*
 
-ENV CHROMIUM_PATH=/usr/bin/chromium \
-    NODE_ENV=production
-
 WORKDIR /home/site/wwwroot
+ENV FUNCTIONS_APPLICATION_DIRECTORY=/home/site/wwwroot
+ENV CHROMIUM_EXECUTABLE=/usr/bin/chromium
+ENV PUPPETEER_SKIP_DOWNLOAD=true
 COPY --from=worker /opt/functions-worker/ /opt/functions-worker/
 COPY --from=dependencies /app/node_modules/ ./node_modules/
-COPY --chown=node:node package.json host.json ./
-COPY --chown=node:node src/ ./src/
+COPY package.json host.json ./
+COPY src/ ./src/
 
 USER node
 ENTRYPOINT ["node", "/opt/functions-worker/dist/src/nodejsWorker.js"]

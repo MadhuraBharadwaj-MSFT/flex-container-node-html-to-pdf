@@ -1,9 +1,9 @@
 const { app } = require('@azure/functions');
-const { htmlToPdfHandler } = require('../html-to-pdf-handler');
+const { htmlToPdfHandler } = require('../pdf/httpHandler');
 
-app.http('htmlToPdf', {
-  route: 'html-to-pdf',
-  methods: ['GET', 'POST'],
-  authLevel: 'anonymous',
-  handler: htmlToPdfHandler,
+app.http('HtmlToPdf', {
+    route: 'html-to-pdf',
+    methods: ['GET', 'POST'],
+    authLevel: 'anonymous',
+    handler: htmlToPdfHandler,
 });

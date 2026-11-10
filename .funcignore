@@ -1,8 +1,12 @@
 .git/
 .github/
+javascript/
+src/
 test/
+vendor/
 *.Dockerfile
 Dockerfile
 LICENSE
 README.md
 local.settings.example.json
+tsconfig.json

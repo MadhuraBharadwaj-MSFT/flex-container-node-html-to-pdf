@@ -1,0 +1,8 @@
+{
+  "IsEncrypted": false,
+  "Values": {
+    "AzureWebJobsStorage": "UseDevelopmentStorage=true",
+    "FUNCTIONS_WORKER_RUNTIME": "node",
+    "CHROMIUM_EXECUTABLE": "<absolute-path-to-a-local-Chromium-or-Chrome-executable>"
+  }
+}

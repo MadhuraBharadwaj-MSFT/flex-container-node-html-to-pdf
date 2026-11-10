@@ -1,8 +1,8 @@
 {
-  "name": "flex-container-node-html-to-pdf",
+  "name": "flex-container-typescript-html-to-pdf",
   "version": "1.0.0",
   "private": true,
-  "main": "src/functions/*.js",
+  "main": "dist/functions/*.js",
   "engines": {
     "node": ">=24 <25"
   },
@@ -11,9 +11,16 @@
     "puppeteer-core": "25.16.0"
   },
   "scripts": {
-    "test": "node --test",
-    "start": "func start"
+    "build": "npm run clean && tsc -p tsconfig.json",
+    "clean": "node -e \"require('node:fs').rmSync('dist', { recursive: true, force: true })\"",
+    "test": "npm run build && node --test test/htmlToPdf.test.js",
+    "start": "npm run build && func start"
   },
-  "description": "Azure Functions Flex Consumption BYOC sample that securely renders HTML to PDF with Puppeteer Core and OS-installed Chromium.",
-  "license": "MIT"
+  "description": "TypeScript-first Azure Functions Flex Consumption BYOC sample that securely renders HTML to PDF with Puppeteer Core and OS-installed Chromium.",
+  "license": "MIT",
+  "devDependencies": {
+    "@types/node": "file:vendor/types-node-24.10.0.tgz",
+    "typescript": "file:vendor/typescript-5.9.3.tgz",
+    "undici-types": "file:vendor/undici-types-7.16.0.tgz"
+  }
 }

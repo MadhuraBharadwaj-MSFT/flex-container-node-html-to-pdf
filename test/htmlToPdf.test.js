@@ -8,8 +8,8 @@ const {
     isAllowedSubresourceUrl,
     readHtmlRequest,
     safePdfFilename,
-} = require('../src/pdf/renderPdf');
-const { htmlToPdfHandler } = require('../src/pdf/httpHandler');
+} = require('../dist/pdf/renderPdf');
+const { htmlToPdfHandler } = require('../dist/pdf/httpHandler');
 
 function makeContext() {
     return {

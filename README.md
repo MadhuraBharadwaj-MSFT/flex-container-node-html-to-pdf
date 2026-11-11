@@ -48,7 +48,7 @@ vendored under `vendor/` so container builds do not depend on a second package
 feed for compiler tooling. The runtime image contains compiled JavaScript,
 production dependencies, the standalone Node worker, Chromium, and fonts. It
 does not contain TypeScript source, TypeScript compiler packages, the vendored
-tarballs, Functions Host, or WorkerProxy.
+tarballs, or Functions Host.
 
 ## Verified versions
 
@@ -68,9 +68,8 @@ The worker archive is checksum-pinned:
 ## BYOC application directory
 
 Worker `3.17.3` consumes the application directory supplied by the preview
-Host/WorkerProxy contract. The image uses `/home/site/wwwroot` as its working
-directory and does not set `FUNCTIONS_APPLICATION_DIRECTORY` or
-`AzureWebJobsScriptRoot`.
+platform contract. The image uses `/home/site/wwwroot` as its working directory
+and does not set `FUNCTIONS_APPLICATION_DIRECTORY` or `AzureWebJobsScriptRoot`.
 
 The TypeScript build emits function entrypoints to:
 
@@ -216,9 +215,8 @@ docker buildx build `
   .
 ```
 
-The image is worker-only. It does not contain Functions Host or WorkerProxy and
-does not expose an HTTP port. The platform supplies the worker's gRPC startup
-arguments.
+The image is worker-only. It does not contain Functions Host and does not
+expose an HTTP port. The platform supplies the worker's gRPC startup arguments.
 
 ## In-container PDF smoke test
 

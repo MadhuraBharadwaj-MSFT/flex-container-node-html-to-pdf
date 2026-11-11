@@ -1,9 +1,12 @@
 .git/
 .github/
+.azure/
+infra/
 javascript/
 src/
 test/
 vendor/
+azure.yaml
 *.Dockerfile
 Dockerfile
 LICENSE

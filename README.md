@@ -105,9 +105,22 @@ browser; the only browser is Debian's Chromium package.
 ```text
 .
 |-- node24.Dockerfile
+|-- azure.yaml
 |-- package.json
 |-- package-lock.json
 |-- tsconfig.json
+|-- infra
+|   |-- abbreviations.json
+|   |-- main.bicep
+|   |-- main.parameters.json
+|   |-- app
+|   |   |-- api.bicep
+|   |   `-- foundation.bicep
+|   `-- scripts
+|       |-- postprovision.ps1
+|       |-- postprovision.sh
+|       |-- postdeploy.ps1
+|       `-- postdeploy.sh
 |-- vendor
 |   |-- types-node-24.10.0.tgz
 |   |-- typescript-5.9.3.tgz
@@ -273,6 +286,193 @@ curl.exe -fS --max-time 120 `
 ```
 
 Successful files begin with `%PDF-` and end with `%%EOF`.
+
+## Deploy with Azure Developer CLI
+
+The `azd` deployment creates the Function App directly as a Registry-backed
+Flex Consumption app. It does not create a code-deployed Function App and then
+convert it.
+
+### Prerequisites
+
+- Azure CLI
+- Azure Developer CLI
+- Docker Engine or Docker Desktop with Buildx
+- Node.js 24
+- An Azure account with permission to create resource groups, role
+  assignments, ACR builds, and Flex Consumption resources
+- Access to the Flex Consumption BYOC preview in the target subscription
+
+Sign in:
+
+```powershell
+az login
+azd auth login
+```
+
+### Azure architecture
+
+The `infra/` layout follows the official Azure Functions `azd` sample pattern:
+shared abbreviations at the root, application modules under `infra/app/`, and
+deployment hooks under `infra/scripts/`.
+
+The foundation Bicep creates:
+
+- one resource group;
+- one Standard_LRS storage account for Functions runtime state;
+- one Log Analytics workspace and Application Insights component;
+- one Basic Azure Container Registry with admin access disabled;
+- one repository-scoped read-only ACR token;
+- one FC1 Flex Consumption plan.
+
+The `postprovision` hook then:
+
+1. Stages a minimal build context so local dependency folders are excluded.
+2. Builds `node24.Dockerfile` with Docker Buildx as Linux AMD64 and pushes it
+   to ACR. Buildx is used because the checksum-pinned `ADD` instruction requires
+   a current Dockerfile frontend.
+3. Resolves the immutable image digest.
+4. Rotates a 30-day password for the read-only pull token.
+5. Creates the Function App directly with:
+
+   ```text
+   functionAppConfig.deployment.storage.type = Registry
+   ```
+
+6. Pins the app to `registry/repository:tag@sha256:digest`.
+7. Restarts the app once.
+
+The token password and runtime storage connection string are passed as secure
+Bicep parameters. Neither value is committed, printed, emitted as a deployment
+output, or saved in the `azd` environment. Rerunning `azd provision` or
+`azd up` builds a new immutable image and rotates the 30-day registry
+credential.
+
+### Create the environment
+
+Set the target subscription, standard resource location, and preview Function
+App display location explicitly because local `azd` defaults can point
+elsewhere:
+
+```powershell
+azd env new node-pdf-byoc --no-prompt
+azd env set AZURE_SUBSCRIPTION_ID <subscription-id>
+azd env set AZURE_LOCATION northcentralus
+azd env set AZURE_FUNCTION_LOCATION "North Central US (Stage)"
+```
+
+Review the selected values:
+
+```powershell
+azd env get-values
+```
+
+### Provision, build, deploy, and verify
+
+```powershell
+azd up
+```
+
+`azd up` performs the infrastructure deployment, ACR build, direct Registry
+Function App creation, and endpoint verification. The final hook verifies:
+
+- Azure inventories `Hello` and `HtmlToPdf`;
+- Hello GET and POST return the exact expected greeting;
+- deployment storage type is `Registry`;
+- the deployed image matches the immutable digest;
+- `FUNCTIONS_APPLICATION_DIRECTORY`, `AzureWebJobsScriptRoot`, and
+  `WEBSITE_RUN_FROM_PACKAGE` are absent;
+- PDF GET and POST return non-empty files beginning with `%PDF-` and ending
+  with `%%EOF`.
+
+Useful deployment values:
+
+```powershell
+azd env get-value API_URL
+azd env get-value AZURE_RESOURCE_GROUP
+azd env get-value AZURE_FUNCTION_NAME
+azd env get-value AZURE_REGISTRY_IMAGE
+azd env get-value AZURE_VERIFIED_UTC
+```
+
+### Verify manually
+
+```powershell
+$baseUrl = azd env get-value API_URL
+
+curl.exe -fS --max-time 120 `
+  "$baseUrl/api/hello"
+
+curl.exe -fS --max-time 120 `
+  "$baseUrl/api/html-to-pdf" `
+  --output invoice.pdf
+
+curl.exe -fS --max-time 120 `
+  -X POST `
+  -H "Content-Type: text/html; charset=utf-8" `
+  -H "X-Pdf-Filename: custom.pdf" `
+  --data-binary "@custom.html" `
+  "$baseUrl/api/html-to-pdf" `
+  --output custom.pdf
+```
+
+### Preview limitations
+
+- The Registry deployment contract uses `Microsoft.Web/sites@2026-08-01`.
+- The validated Function App and plan location is
+  `North Central US (Stage)`, while supporting resources use
+  `northcentralus`.
+- The Stage location currently rejects App Service managed identities. The
+  Function App therefore uses the storage account connection string, supplied
+  only as a secure Bicep parameter. Use managed identity instead when the
+  Registry contract is available in a location that supports site identities.
+- The image is worker-only. Azure supplies Functions Host and the worker
+  transport outside the image.
+- ACR and storage use public service endpoints for preview compatibility.
+  Storage anonymous blob access is disabled; registry pull access is
+  repository-scoped.
+- HTTP triggers remain anonymous for sample validation. Add authentication,
+  authorization, rate limiting, and abuse protection before production use.
+
+### Retained cost items
+
+An active environment retains an FC1 plan/app, ACR, storage account, Log
+Analytics workspace, and Application Insights. ACR and monitoring can incur
+charges even when the Function App is idle.
+
+### Cleanup
+
+Review the environment before deleting it:
+
+```powershell
+azd env get-values
+az resource list `
+  --resource-group (azd env get-value AZURE_RESOURCE_GROUP) `
+  --output table
+```
+
+Delete the environment only when its retained resources are no longer needed:
+
+```powershell
+azd down --force
+```
+
+This deletes the resource group created for the selected `azd` environment. It
+does not delete local source files.
+
+### Troubleshooting
+
+- If the app does not index functions immediately, wait for the bounded
+  verification hook. It performs one clean restart after two minutes.
+- If the Docker build or push fails, confirm Docker is running and rerun
+  `azd provision`; the foundation deployment is idempotent.
+- If the Registry credential expires, rerun `azd provision` or `azd up` to
+  rotate it and repin the app.
+- If Azure Policy denies a resource, do not weaken the policy. Review the
+  failing assignment and adjust networking or resource settings.
+- Do not add `FUNCTIONS_APPLICATION_DIRECTORY` or
+  `AzureWebJobsScriptRoot`; worker 3.17.3 resolves `/home/site/wwwroot`
+  without either override.
 
 ## License
 

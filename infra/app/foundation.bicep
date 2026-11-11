@@ -8,14 +8,15 @@ param location string = resourceGroup().location
 param functionLocation string
 param tags object = {}
 
+var abbrs = loadJsonContent('../abbreviations.json')
 var resourceToken = take(toLower(uniqueString(subscription().id, resourceGroup().id, name, location)), 10)
 var compactName = take(replace(replace(toLower(name), '-', ''), '_', ''), 10)
-var storageAccountName = 'st${compactName}${resourceToken}'
-var containerRegistryName = 'acr${compactName}${resourceToken}'
-var logAnalyticsName = 'log-${take(name, 20)}-${take(resourceToken, 6)}'
-var applicationInsightsName = 'appi-${take(name, 18)}-${take(resourceToken, 6)}'
-var appServicePlanName = 'plan-${take(name, 18)}-${take(resourceToken, 6)}'
-var functionAppName = 'fn-${take(name, 20)}-${take(resourceToken, 8)}'
+var storageAccountName = '${abbrs.storageStorageAccounts}${compactName}${resourceToken}'
+var containerRegistryName = '${abbrs.containerRegistryRegistries}${compactName}${resourceToken}'
+var logAnalyticsName = '${abbrs.operationalInsightsWorkspaces}${take(name, 20)}-${take(resourceToken, 6)}'
+var applicationInsightsName = '${abbrs.insightsComponents}${take(name, 18)}-${take(resourceToken, 6)}'
+var appServicePlanName = '${abbrs.webServerFarms}${take(name, 18)}-${take(resourceToken, 6)}'
+var functionAppName = '${abbrs.webSitesFunctions}${take(name, 20)}-${take(resourceToken, 8)}'
 var imageRepository = 'flex-container-node-html-to-pdf'
 var scopeMapName = 'pull-${take(resourceToken, 10)}-ro'
 var tokenName = 'pull-${take(resourceToken, 10)}'

@@ -3,7 +3,6 @@
 .azure/
 infra/
 javascript/
-scripts/
 src/
 test/
 vendor/

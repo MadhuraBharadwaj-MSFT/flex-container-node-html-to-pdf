@@ -2,7 +2,7 @@
 set -eu
 
 SCRIPT_DIR=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)
-REPOSITORY_ROOT=$(CDPATH= cd -- "$SCRIPT_DIR/.." && pwd)
+REPOSITORY_ROOT=$(CDPATH= cd -- "$SCRIPT_DIR/../.." && pwd)
 cd "$REPOSITORY_ROOT"
 
 get_azd_value() {
@@ -190,7 +190,7 @@ DEPLOYMENT_NAME="registry-app-$TIMESTAMP"
 STATE=$(az deployment group create \
     --resource-group "$AZURE_RESOURCE_GROUP" \
     --name "$DEPLOYMENT_NAME" \
-    --template-file ./infra/function-app.bicep \
+    --template-file ./infra/app/api.bicep \
     --parameters "@$PARAMETER_PATH" \
     --query properties.provisioningState \
     --output tsv \

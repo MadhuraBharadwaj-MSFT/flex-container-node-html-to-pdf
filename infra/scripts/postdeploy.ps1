@@ -1,6 +1,7 @@
 $ErrorActionPreference = 'Stop'
 $PSNativeCommandUseErrorActionPreference = $true
 
+# Root-level azd hooks run with the repository as their working directory.
 function Get-AzdValue {
     param([Parameter(Mandatory)][string]$Name)
 

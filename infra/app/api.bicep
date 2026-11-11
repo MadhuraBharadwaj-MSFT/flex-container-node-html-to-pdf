@@ -1,5 +1,6 @@
 targetScope = 'resourceGroup'
 
+@description('Azure Developer CLI environment name used for resource tags.')
 param environmentName string
 param functionAppName string
 param functionLocation string

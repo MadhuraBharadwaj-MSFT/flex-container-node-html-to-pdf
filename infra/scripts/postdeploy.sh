@@ -1,6 +1,7 @@
 #!/usr/bin/env sh
 set -eu
 
+# Root-level azd hooks run with the repository as their working directory.
 get_azd_value() {
     name=$1
     eval "value=\${$name:-}"

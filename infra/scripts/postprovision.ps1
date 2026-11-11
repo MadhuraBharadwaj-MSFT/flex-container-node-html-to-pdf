@@ -1,7 +1,7 @@
 $ErrorActionPreference = 'Stop'
 $PSNativeCommandUseErrorActionPreference = $true
 
-$repositoryRoot = Split-Path -Parent $PSScriptRoot
+$repositoryRoot = Split-Path -Parent (Split-Path -Parent $PSScriptRoot)
 Push-Location $repositoryRoot
 
 function Get-AzdValue {
@@ -165,7 +165,7 @@ try {
     $state = (& az deployment group create `
             --resource-group $resourceGroup `
             --name $deploymentName `
-            --template-file .\infra\function-app.bicep `
+            --template-file .\infra\app\api.bicep `
             --parameters "@$parameterPath" `
             --query properties.provisioningState `
             --output tsv `

@@ -11,10 +11,11 @@ param location string
 @description('Preview display location used for the Flex Consumption plan and Function App.')
 param functionLocation string
 
+var abbrs = loadJsonContent('./abbreviations.json')
 var tags = {
   'azd-env-name': environmentName
 }
-var resourceGroupName = 'rg-${environmentName}-${take(toLower(uniqueString(subscription().id, environmentName, location)), 6)}'
+var resourceGroupName = '${abbrs.resourcesResourceGroups}${environmentName}-${take(toLower(uniqueString(subscription().id, environmentName, location)), 6)}'
 
 resource resourceGroup 'Microsoft.Resources/resourceGroups@2024-03-01' = {
   name: resourceGroupName
@@ -22,7 +23,7 @@ resource resourceGroup 'Microsoft.Resources/resourceGroups@2024-03-01' = {
   tags: tags
 }
 
-module foundation './app/main.bicep' = {
+module foundation './app/foundation.bicep' = {
   name: 'foundation'
   scope: resourceGroup
   params: {

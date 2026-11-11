@@ -110,16 +110,17 @@ browser; the only browser is Debian's Chromium package.
 |-- package-lock.json
 |-- tsconfig.json
 |-- infra
+|   |-- abbreviations.json
 |   |-- main.bicep
 |   |-- main.parameters.json
-|   |-- function-app.bicep
-|   `-- app
-|       `-- main.bicep
-|-- scripts
-|   |-- post-provision.ps1
-|   |-- post-provision.sh
-|   |-- post-deploy.ps1
-|   `-- post-deploy.sh
+|   |-- app
+|   |   |-- api.bicep
+|   |   `-- foundation.bicep
+|   `-- scripts
+|       |-- postprovision.ps1
+|       |-- postprovision.sh
+|       |-- postdeploy.ps1
+|       `-- postdeploy.sh
 |-- vendor
 |   |-- types-node-24.10.0.tgz
 |   |-- typescript-5.9.3.tgz
@@ -310,6 +311,10 @@ azd auth login
 ```
 
 ### Azure architecture
+
+The `infra/` layout follows the official Azure Functions `azd` sample pattern:
+shared abbreviations at the root, application modules under `infra/app/`, and
+deployment hooks under `infra/scripts/`.
 
 The foundation Bicep creates:
 

@@ -13,7 +13,7 @@
   "scripts": {
     "build": "npm run clean && tsc -p tsconfig.json",
     "clean": "node -e \"require('node:fs').rmSync('dist', { recursive: true, force: true })\"",
-    "test": "npm run build && node --test test/htmlToPdf.test.js",
+    "test": "npm run build && node --test test/htmlToPdf.test.js test/imageContext.test.js",
     "start": "npm run build && func start"
   },
   "description": "TypeScript-first Azure Functions Flex Consumption BYOC sample that securely renders HTML to PDF with Puppeteer Core and OS-installed Chromium.",

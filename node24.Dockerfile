@@ -1,10 +1,13 @@
 FROM node:24-bookworm-slim AS worker
 
-ADD --checksum=sha256:93fbe6f007a5eab62f28e30b3fbb93c61c53ba3b9890cc135d982a8af1e4f3ca \
-    https://github.com/Azure/azure-functions-nodejs-worker/releases/download/v3.17.3/azure-functions-nodejs-worker-3.17.3.tar.gz \
+ADD https://github.com/Azure/azure-functions-nodejs-worker/releases/download/v3.17.3/azure-functions-nodejs-worker-3.17.3.tar.gz \
     /tmp/worker.tar.gz
 
-RUN mkdir -p /opt/functions-worker \
+RUN printf '%s  %s\n' \
+        '93fbe6f007a5eab62f28e30b3fbb93c61c53ba3b9890cc135d982a8af1e4f3ca' \
+        '/tmp/worker.tar.gz' \
+        | sha256sum -c - \
+    && mkdir -p /opt/functions-worker \
     && tar -xzf /tmp/worker.tar.gz -C /opt/functions-worker \
     && rm /tmp/worker.tar.gz
 

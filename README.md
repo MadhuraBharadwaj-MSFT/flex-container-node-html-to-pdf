@@ -117,6 +117,9 @@ browser; the only browser is Debian's Chromium package.
 |   |   |-- api.bicep
 |   |   `-- foundation.bicep
 |   `-- scripts
+|       |-- imagecontext.mjs
+|       |-- deployimage.ps1
+|       |-- deployimage.sh
 |       |-- postprovision.ps1
 |       |-- postprovision.sh
 |       |-- postdeploy.ps1
@@ -297,10 +300,9 @@ convert it.
 
 - Azure CLI
 - Azure Developer CLI
-- Docker Engine or Docker Desktop with Buildx
 - Node.js 24
-- An Azure account with permission to create resource groups, role
-  assignments, ACR builds, and Flex Consumption resources
+- An Azure account with permission to create resource groups, run ACR builds,
+  and create Flex Consumption resources
 - Access to the Flex Consumption BYOC preview in the target subscription
 
 Sign in:
@@ -327,26 +329,32 @@ The foundation Bicep creates:
 
 The `postprovision` hook then:
 
-1. Stages a minimal build context so local dependency folders are excluded.
-2. Builds `node24.Dockerfile` with Docker Buildx as Linux AMD64 and pushes it
-   to ACR. Buildx is used because the checksum-pinned `ADD` instruction requires
-   a current Dockerfile frontend.
-3. Resolves the immutable image digest.
-4. Rotates a 30-day password for the read-only pull token.
-5. Creates the Function App directly with:
+1. Stages only the files that can affect the image and calculates a
+   deterministic SHA-256 over their paths and contents.
+2. Uses that hash as the ACR tag and disables write/delete operations on the
+   resolved tag so its digest cannot be moved.
+3. Reuses the existing tag when the exact context was already built; otherwise
+   runs an Azure Container Registry quick build for Linux AMD64.
+4. Resolves the immutable image digest.
+5. Rotates a 30-day password for the read-only pull token.
+6. Creates or updates the Function App directly with:
 
    ```text
    functionAppConfig.deployment.storage.type = Registry
    ```
 
-6. Pins the app to `registry/repository:tag@sha256:digest`.
-7. Restarts the app once.
+7. Pins the app to `registry/repository:tag@sha256:digest`.
+8. Restarts the app once.
+
+The worker download remains SHA-256 verified. The Dockerfile performs the
+verification in a `RUN` step after the remote `ADD`, which is compatible with
+ACR Tasks and still fails the build if the archive does not match.
 
 The token password and runtime storage connection string are passed as secure
 Bicep parameters. Neither value is committed, printed, emitted as a deployment
 output, or saved in the `azd` environment. Rerunning `azd provision` or
-`azd up` builds a new immutable image and rotates the 30-day registry
-credential.
+`azd up` skips the remote build when the image inputs are unchanged, then
+rotates the 30-day registry credential and reapplies the digest-pinned app.
 
 ### Create the environment
 
@@ -373,8 +381,9 @@ azd env get-values
 azd up
 ```
 
-`azd up` performs the infrastructure deployment, ACR build, direct Registry
-Function App creation, and endpoint verification. The final hook verifies:
+`azd up` performs the infrastructure deployment, ACR build or reuse, direct
+Registry Function App creation, and endpoint verification. The final hook
+verifies:
 
 - Azure inventories `Hello` and `HtmlToPdf`;
 - Hello GET and POST return the exact expected greeting;
@@ -392,7 +401,39 @@ azd env get-value API_URL
 azd env get-value AZURE_RESOURCE_GROUP
 azd env get-value AZURE_FUNCTION_NAME
 azd env get-value AZURE_REGISTRY_IMAGE
+azd env get-value AZURE_IMAGE_CONTEXT_HASH
+azd env get-value AZURE_IMAGE_BUILD_ACTION
 azd env get-value AZURE_VERIFIED_UTC
+```
+
+### Deploy only image changes
+
+After the environment has been provisioned once, use the image deployment
+script for the fast edit/build/repoint/verify loop. It does not rerun the
+foundation Bicep deployment:
+
+```powershell
+.\infra\scripts\deployimage.ps1 -Verify
+```
+
+On macOS or Linux:
+
+```sh
+sh ./infra/scripts/deployimage.sh --verify
+```
+
+The script stages the minimal context, computes its SHA-256 tag, and asks ACR
+whether that tag already exists. Changed image inputs trigger `az acr build`;
+unchanged inputs reuse the existing digest. The resolved tag is write/delete
+locked. Both paths rotate the scoped pull credential, update the
+Registry-backed Function App, restart it, and verify the Hello and PDF
+endpoints when `-Verify` or `--verify` is supplied.
+
+Omit the verification option when another command will run the post-deploy
+checks separately:
+
+```powershell
+.\infra\scripts\deployimage.ps1
 ```
 
 ### Verify manually
@@ -464,8 +505,11 @@ does not delete local source files.
 
 - If the app does not index functions immediately, wait for the bounded
   verification hook. It performs one clean restart after two minutes.
-- If the Docker build or push fails, confirm Docker is running and rerun
-  `azd provision`; the foundation deployment is idempotent.
+- If an ACR build fails, open its run in ACR, review the quick-build log,
+  correct the Dockerfile or build inputs, and rerun the image deployment.
+- If an unchanged deployment unexpectedly rebuilds, compare
+  `AZURE_IMAGE_CONTEXT_HASH` and the staged input list in
+  `infra/scripts/imagecontext.mjs`.
 - If the Registry credential expires, rerun `azd provision` or `azd up` to
   rotate it and repin the app.
 - If Azure Policy denies a resource, do not weaken the policy. Review the

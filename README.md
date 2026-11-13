@@ -23,7 +23,6 @@ urlFragment: flex-container-node-html-to-pdf
 
 This sample accepts self-contained HTML in an HTTP POST request and returns a
 PDF rendered with Puppeteer Core and the operating system's Chromium package.
-It also provides a GET endpoint that returns a built-in invoice PDF.
 
 The Azure Functions app runs from a Node.js 24 Flex Consumption container.
 Azure Developer CLI (`azd`) provisions the Azure resources, builds the
@@ -41,7 +40,7 @@ and verifies the live endpoints.
 
 1. Clone the repository.
 1. Run `azd up` to build and deploy the Node.js 24 container.
-1. GET the built-in invoice or POST your HTML to `/api/html-to-pdf`.
+1. POST your HTML to `/api/html-to-pdf`.
 1. Save or display the returned `application/pdf` response.
 
 You may use `func start` to verify the function code locally. During the
@@ -69,15 +68,15 @@ cd flex-container-node-html-to-pdf
 
 ## How it works
 
-The TypeScript app exposes two HTTP functions:
+[`src/functions/htmlToPdf.ts`](./src/functions/htmlToPdf.ts) exposes the
+customer endpoint:
 
-| Method | Route | Behavior |
-|---|---|---|
-| GET / POST | `/api/hello` | Returns `Hello from the BYOC Node.js worker.` |
-| GET | `/api/html-to-pdf` | Returns a built-in invoice PDF |
-| POST | `/api/html-to-pdf` | Converts bounded UTF-8 `text/html` to PDF |
+```text
+POST /api/html-to-pdf
+Content-Type: text/html; charset=utf-8
+```
 
-For HTML-to-PDF requests, the app:
+The function:
 
 1. validates the media type, UTF-8 body, and 256 KiB input limit;
 1. sanitizes the optional `X-Pdf-Filename` response filename;
@@ -93,10 +92,6 @@ Exact runtime and dependency pins live in
 [`package.json`](./package.json), and
 [`package-lock.json`](./package-lock.json). Those files are the source of truth
 for version updates.
-
-The TypeScript compiler emits function entrypoints to `dist/functions`. The
-multi-stage image copies only compiled JavaScript, production dependencies,
-the standalone Node worker, Chromium, and fonts into the runtime image.
 
 ## How the container image is built
 
@@ -152,14 +147,6 @@ azd up
 For unattended execution, use `azd up --no-prompt` after all four environment
 values are set.
 
-The deployment creates the Function App directly with:
-
-```text
-functionAppConfig.deployment.storage.type = Registry
-```
-
-It doesn't create a code-deployed Function App and convert it afterward.
-
 ## Test the deployed container
 
 Get the deployed endpoint.
@@ -174,20 +161,6 @@ Bash:
 
 ```bash
 API_URL=$(azd env get-value API_URL)
-```
-
-Verify the Hello endpoint:
-
-PowerShell:
-
-```powershell
-curl.exe --fail --show-error "$apiUrl/api/hello"
-```
-
-Bash:
-
-```bash
-curl --fail --show-error "$API_URL/api/hello"
 ```
 
 POST the included [`sample.html`](./sample.html).
@@ -261,12 +234,6 @@ The displayed PDF should contain:
 - **Azure Functions HTML-to-PDF**
 - **Rendered with Puppeteer Core and system Chromium**
 - **This document is self-contained and doesn't load external resources.**
-
-You can also download the built-in invoice:
-
-```shell
-curl --fail --show-error "$API_URL/api/html-to-pdf" --output invoice.pdf
-```
 
 ## Redeploy container changes
 

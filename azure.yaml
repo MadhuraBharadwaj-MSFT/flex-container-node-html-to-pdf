@@ -2,7 +2,7 @@
 
 name: flex-container-node-html-to-pdf
 metadata:
-  template: flex-container-node-html-to-pdf@1.2.0
+  template: flex-container-node-html-to-pdf@1.3.0
 
 infra:
   provider: bicep

@@ -61,13 +61,34 @@ if [ "$HELLO_POST" != "$EXPECTED_HELLO" ]; then
     exit 1
 fi
 
-FUNCTION_NAMES=$(az rest \
-    --method get \
-    --url "https://management.azure.com$SITE_ID/functions?api-version=2026-08-01" \
-    --query 'value[].name' \
-    --output tsv)
-printf '%s\n' "$FUNCTION_NAMES" | grep -Eq '(^|/)Hello$'
-printf '%s\n' "$FUNCTION_NAMES" | grep -Eq '(^|/)HtmlToPdf$'
+FUNCTION_NAMES=
+FUNCTION_COUNT=0
+INVENTORY_ATTEMPT=1
+while [ "$INVENTORY_ATTEMPT" -le 24 ]; do
+    FUNCTION_NAMES=$(az rest \
+        --method get \
+        --url "https://management.azure.com$SITE_ID/functions?api-version=2026-08-01" \
+        --query 'value[].name' \
+        --output tsv)
+    FUNCTION_COUNT=$(
+        printf '%s\n' "$FUNCTION_NAMES" |
+            awk 'NF { count++ } END { print count + 0 }'
+    )
+    if [ "$FUNCTION_COUNT" -eq 2 ] &&
+        printf '%s\n' "$FUNCTION_NAMES" | grep -Eq '(^|/)Hello$' &&
+        printf '%s\n' "$FUNCTION_NAMES" | grep -Eq '(^|/)HtmlToPdf$'; then
+        break
+    fi
+    INVENTORY_ATTEMPT=$((INVENTORY_ATTEMPT + 1))
+    sleep 5
+done
+
+if [ "$FUNCTION_COUNT" -ne 2 ] ||
+    ! printf '%s\n' "$FUNCTION_NAMES" | grep -Eq '(^|/)Hello$' ||
+    ! printf '%s\n' "$FUNCTION_NAMES" | grep -Eq '(^|/)HtmlToPdf$'; then
+    echo "Azure did not inventory only Hello and HtmlToPdf: $FUNCTION_NAMES" >&2
+    exit 1
+fi
 
 DEPLOYMENT_JSON=$(az rest \
     --method get \

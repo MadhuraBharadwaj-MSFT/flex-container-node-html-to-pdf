@@ -240,7 +240,7 @@ azd env set AZURE_REGISTRY_IMAGE "$REGISTRY_IMAGE" --no-prompt >/dev/null
 azd env set API_URL "https://$AZURE_FUNCTION_NAME.azurewebsites.net" --no-prompt \
     >/dev/null
 
-az functionapp restart \
+az functionapp start \
     --resource-group "$AZURE_RESOURCE_GROUP" \
     --name "$AZURE_FUNCTION_NAME" \
     --only-show-errors

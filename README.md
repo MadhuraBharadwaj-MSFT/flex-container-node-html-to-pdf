@@ -1,521 +1,360 @@
-# Flex Container TypeScript HTML-to-PDF
+<!--
+---
+name: TypeScript HTML-to-PDF on Azure Functions Flex Consumption containers
+description: >-
+  This sample contains an Azure Functions Flex Consumption container
+  application written in TypeScript for Node.js 24. It accepts bounded HTML
+  and returns a PDF rendered with Puppeteer Core and OS-installed Chromium.
+page_type: sample
+languages:
+- typescript
+- bicep
+- azdeveloper
+- dockerfile
+products:
+- azure
+- azure-functions
+- azure-container-registry
+urlFragment: flex-container-node-html-to-pdf
+---
+-->
 
-TypeScript-first Azure Functions Flex Consumption BYOC sample for Node.js 24.
-It compiles strict TypeScript into the application directory, runs the
-standalone Azure Functions Node worker in a Linux AMD64 container, and renders
-bounded HTML to PDF with `puppeteer-core` and Debian's OS-installed Chromium.
+# TypeScript HTML-to-PDF on Azure Functions Flex Consumption containers
 
-The repository root is the primary TypeScript implementation. The previously
-validated JavaScript implementation remains available in
-[`javascript/`](./javascript/README.md).
+This sample accepts self-contained HTML in an HTTP POST request and returns a
+PDF rendered with Puppeteer Core and the operating system's Chromium package.
+It also provides a GET endpoint that returns a built-in invoice PDF.
 
-> This uses a preview BYOC hosting contract. It is sample guidance, not a
-> production support policy. The HTTP triggers are anonymous for validation;
-> add authentication, authorization, and abuse controls before production use.
+The Azure Functions app runs from a Node.js 24 Flex Consumption container.
+Azure Developer CLI (`azd`) provisions the Azure resources, builds the
+container with Azure Container Registry Tasks, deploys it by immutable digest,
+and verifies the live endpoints.
 
-## What it exposes
+![Architecture diagram for TypeScript HTML-to-PDF on Azure Functions Flex Consumption containers](./img/architecture.svg)
+
+> [!IMPORTANT]
+> Azure Functions Flex Consumption container support is currently in preview.
+> Preview capabilities and deployment requirements may change before general
+> availability.
+
+## Sample workflow
+
+1. Clone the repository.
+1. Run `azd up` to build and deploy the Node.js 24 container.
+1. GET the built-in invoice or POST your HTML to `/api/html-to-pdf`.
+1. Save or display the returned `application/pdf` response.
+
+You may use `func start` to verify the function code locally. During the
+preview, deploy to Azure for end-to-end container validation.
+
+## Prerequisites
+
+- [Git](https://git-scm.com/downloads)
+- [Node.js 24](https://nodejs.org/)
+- [Azure CLI](https://learn.microsoft.com/cli/azure/install-azure-cli)
+- [Azure Developer CLI](https://learn.microsoft.com/azure/developer/azure-developer-cli/install-azd)
+- an Azure subscription enabled for the Registry-backed Flex Consumption
+  container preview
+- permission to create resource groups, storage, monitoring, Azure Container
+  Registry, FC1 plans, and Function Apps
+
+Local Docker isn't required for the `azd` deployment.
+
+## Initialize the project
+
+```shell
+git clone https://github.com/MadhuraBharadwaj-MSFT/flex-container-node-html-to-pdf.git
+cd flex-container-node-html-to-pdf
+```
+
+## How it works
+
+The TypeScript app exposes two HTTP functions:
 
 | Method | Route | Behavior |
 |---|---|---|
 | GET / POST | `/api/hello` | Returns `Hello from the BYOC Node.js worker.` |
-| GET | `/api/html-to-pdf` | Returns a built-in polished invoice PDF |
-| POST | `/api/html-to-pdf` | Converts bounded raw `text/html` to PDF |
+| GET | `/api/html-to-pdf` | Returns a built-in invoice PDF |
+| POST | `/api/html-to-pdf` | Converts bounded UTF-8 `text/html` to PDF |
 
-POST accepts an optional `X-Pdf-Filename` header. The value is sanitized before
-being used in `Content-Disposition`.
+For HTML-to-PDF requests, the app:
 
-## TypeScript build and runtime flow
+1. validates the media type, UTF-8 body, and 256 KiB input limit;
+1. sanitizes the optional `X-Pdf-Filename` response filename;
+1. launches OS-installed Chromium with Puppeteer Core as a non-root user;
+1. disables JavaScript, enables offline mode, and blocks external subresources;
+1. enforces one concurrent render, a 20-second render timeout, and a 5 MiB
+   output limit;
+1. validates cleanup of browser and page resources;
+1. returns `application/pdf` with no-store and nosniff headers.
 
-```text
-src/**/*.ts
-    |
-    | tsc --strict
-    v
-dist/functions/*.js + dist/pdf/*.js
-    |
-    | copied into the final image
-    v
-/home/site/wwwroot/dist
-    |
-    | package.json main = dist/functions/*.js
-    v
-Azure Functions Node worker 3.17.3
-```
+Exact runtime and dependency pins live in
+[`node24.Dockerfile`](./node24.Dockerfile),
+[`package.json`](./package.json), and
+[`package-lock.json`](./package-lock.json). Those files are the source of truth
+for version updates.
 
-The multi-stage image installs TypeScript only in the build stage. Exact
-build-only tarballs for TypeScript, Node.js types, and `undici-types` are
-vendored under `vendor/` so container builds do not depend on a second package
-feed for compiler tooling. The runtime image contains compiled JavaScript,
-production dependencies, the standalone Node worker, Chromium, and fonts. It
-does not contain TypeScript source, TypeScript compiler packages, the vendored
-tarballs, or Functions Host.
+The TypeScript compiler emits function entrypoints to `dist/functions`. The
+multi-stage image copies only compiled JavaScript, production dependencies,
+the standalone Node worker, Chromium, and fonts into the runtime image.
 
-## Verified versions
+## How the container image is built
 
-- Node.js `24.22.2`
-- TypeScript `5.9.3`
-- Azure Functions Node worker `3.17.3`
-- `@azure/functions` `4.17.0`
-- `puppeteer-core` `25.16.0`
-- Debian Chromium `156.0.8078.79`
+The deployment uses
+[Azure Container Registry Tasks](https://learn.microsoft.com/azure/container-registry/container-registry-tasks-overview)
+to build the Linux AMD64 image in Azure. Customers don't need local Docker to
+deploy the sample.
 
-The worker archive is checksum-pinned:
+During `azd up`:
 
-```text
-93fbe6f007a5eab62f28e30b3fbb93c61c53ba3b9890cc135d982a8af1e4f3ca
-```
+1. [`imagecontext.mjs`](./infra/scripts/imagecontext.mjs) stages only files
+   that affect the image and calculates a deterministic SHA-256.
+1. The hash becomes the image tag: `azd-<context-hash>`.
+1. An existing tag is reused; otherwise `az acr build` runs the ACR Tasks
+   quick build.
+1. The workflow resolves the registry manifest digest.
+1. The Function App is pinned to
+   `registry/repository:tag@sha256:digest`.
+1. The tag is write- and delete-locked so its digest can't move.
 
-## BYOC application directory
+The Node worker archive is also SHA-256 verified during the image build.
 
-Worker `3.17.3` consumes the application directory supplied by the preview
-platform contract. The image uses `/home/site/wwwroot` as its working directory
-and does not set `FUNCTIONS_APPLICATION_DIRECTORY` or `AzureWebJobsScriptRoot`.
-
-The TypeScript build emits function entrypoints to:
-
-```text
-/home/site/wwwroot/dist/functions
-```
-
-## Rendering controls
-
-- HTML input limit: 256 KiB
-- PDF output limit: 5 MiB
-- Chromium launch timeout: 15 seconds
-- Content and PDF timeout: 20 seconds
-- One concurrent render per worker process
-- JavaScript disabled
-- Browser offline mode enabled
-- Request interception allows only `about:` and `data:` resources
-- No URL parameter or arbitrary URL-fetch feature
-- Safe ASCII output filenames
-- Browser and page cleanup after every render
-- Non-root `node` user
-- Chromium sandbox retained
-
-The image installs both `chromium` and `chromium-sandbox`. It never adds
-`--no-sandbox` or `--disable-setuid-sandbox`.
-
-`puppeteer-core` is used intentionally. The package does not download a second
-browser; the only browser is Debian's Chromium package.
-
-## Repository layout
-
-```text
-.
-|-- node24.Dockerfile
-|-- azure.yaml
-|-- package.json
-|-- package-lock.json
-|-- tsconfig.json
-|-- infra
-|   |-- abbreviations.json
-|   |-- main.bicep
-|   |-- main.parameters.json
-|   |-- app
-|   |   |-- api.bicep
-|   |   `-- foundation.bicep
-|   `-- scripts
-|       |-- imagecontext.mjs
-|       |-- deployimage.ps1
-|       |-- deployimage.sh
-|       |-- postprovision.ps1
-|       |-- postprovision.sh
-|       |-- postdeploy.ps1
-|       `-- postdeploy.sh
-|-- vendor
-|   |-- types-node-24.10.0.tgz
-|   |-- typescript-5.9.3.tgz
-|   `-- undici-types-7.16.0.tgz
-|-- host.json
-|-- src
-|   |-- functions
-|   |   |-- hello.ts
-|   |   `-- htmlToPdf.ts
-|   `-- pdf
-|       |-- httpHandler.ts
-|       `-- renderPdf.ts
-|-- test
-|   `-- htmlToPdf.test.js
-`-- javascript
-    |-- README.md
-    `-- ... runnable JavaScript sample
-```
-
-## Build and run focused tests
-
-Use Node.js 24:
-
-```powershell
-npm ci
-npm run build
-npm test
-```
-
-`npm test` performs a clean TypeScript build before running the focused tests.
-The tests cover filename safety, input limits, media-type validation, external
-resource blocking, JavaScript controls, response headers, and
-sandbox-preserving Chromium arguments.
-
-## Optional local Functions Host
-
-Copy the example settings:
-
-```powershell
-Copy-Item .\local.settings.example.json .\local.settings.json
-```
-
-Set `CHROMIUM_EXECUTABLE` in `local.settings.json` to an installed Chromium,
-Chrome, or Edge executable, then run:
-
-```powershell
-npm ci
-npm start
-```
-
-Test the built-in invoice:
-
-```powershell
-curl.exe -fS `
-  http://localhost:7071/api/html-to-pdf `
-  --output invoice.pdf
-```
-
-Test POST:
-
-```powershell
-@'
-<!doctype html>
-<html>
-<body>
-  <h1>Custom PDF</h1>
-  <p>Rendered from bounded raw HTML.</p>
-</body>
-</html>
-'@ | Set-Content .\custom.html -Encoding utf8
-
-curl.exe -fS `
-  -X POST `
-  -H "Content-Type: text/html; charset=utf-8" `
-  -H "X-Pdf-Filename: custom.pdf" `
-  --data-binary "@custom.html" `
-  http://localhost:7071/api/html-to-pdf `
-  --output custom.pdf
-```
-
-## Build the Linux AMD64 worker image
-
-```powershell
-docker buildx build `
-  --platform linux/amd64 `
-  --file .\node24.Dockerfile `
-  --tag flex-container-node-html-to-pdf:typescript `
-  --load `
-  --provenance=false `
-  .
-```
-
-The image is worker-only. It does not contain Functions Host and does not
-expose an HTTP port. The platform supplies the worker's gRPC startup arguments.
-
-## In-container PDF smoke test
-
-Docker Desktop can block Chromium's nested namespace transition. The following
-test-only capability lets Chromium exercise its sandbox locally; the deployed
-Azure environment did not require a no-sandbox fallback.
-
-```powershell
-@'
-const { defaultInvoiceHtml, renderHtmlToPdf } = require('./dist/pdf/renderPdf');
-
-(async () => {
-  const pdf = await renderHtmlToPdf(defaultInvoiceHtml());
-  const prefix = pdf.subarray(0, 5).toString('ascii');
-  const tail = pdf.subarray(Math.max(0, pdf.length - 64)).toString('ascii');
-  if (prefix !== '%PDF-' || !/%%EOF\s*$/.test(tail)) {
-    throw new Error('Invalid PDF');
-  }
-  console.log({ bytes: pdf.length, prefix });
-})().catch((error) => {
-  console.error(error);
-  process.exit(1);
-});
-'@ | docker run -i --rm `
-  --platform linux/amd64 `
-  --cap-add SYS_ADMIN `
-  --entrypoint node `
-  flex-container-node-html-to-pdf:typescript -
-```
-
-## JavaScript reference
-
-The original implementation is self-contained under [`javascript/`](./javascript/).
-From that folder:
-
-```powershell
-npm ci
-npm test
-```
-
-Its Dockerfile and lockfile remain independent of the TypeScript root sample.
-
-## Azure verification
-
-The compiled TypeScript application layout was verified on Azure Flex
-Consumption BYOC with both application-directory environment variables absent.
-Azure indexed `Hello` and `HtmlToPdf` from
-`/home/site/wwwroot/dist/functions`; Hello and both PDF methods returned HTTP
-200, and the GET and POST files had valid `%PDF-` and `%%EOF` markers.
-
-After deploying the image through the Flex Consumption BYOC Registry contract,
-verify both methods:
-
-```powershell
-$baseUrl = 'https://<function-app-hostname>'
-
-curl.exe -fS --max-time 120 `
-  "$baseUrl/api/html-to-pdf" `
-  --output invoice.pdf
-
-curl.exe -fS --max-time 120 `
-  -X POST `
-  -H "Content-Type: text/html; charset=utf-8" `
-  -H "X-Pdf-Filename: custom.pdf" `
-  --data-binary "@custom.html" `
-  "$baseUrl/api/html-to-pdf" `
-  --output custom.pdf
-```
-
-Successful files begin with `%PDF-` and end with `%%EOF`.
-
-## Deploy with Azure Developer CLI
-
-The `azd` deployment creates the Function App directly as a Registry-backed
-Flex Consumption app. It does not create a code-deployed Function App and then
-convert it.
-
-### Prerequisites
-
-- Azure CLI
-- Azure Developer CLI
-- Node.js 24
-- An Azure account with permission to create resource groups, run ACR builds,
-  and create Flex Consumption resources
-- Access to the Flex Consumption BYOC preview in the target subscription
+## Deploy to Azure
 
 Sign in:
 
-```powershell
+```shell
 az login
 azd auth login
 ```
 
-### Azure architecture
+Create an `azd` environment and set the required deployment locations:
 
-The `infra/` layout follows the official Azure Functions `azd` sample pattern:
-shared abbreviations at the root, application modules under `infra/app/`, and
-deployment hooks under `infra/scripts/`.
-
-The foundation Bicep creates:
-
-- one resource group;
-- one Standard_LRS storage account for Functions runtime state;
-- one Log Analytics workspace and Application Insights component;
-- one Basic Azure Container Registry with admin access disabled;
-- one repository-scoped read-only ACR token;
-- one FC1 Flex Consumption plan.
-
-The `postprovision` hook then:
-
-1. Stages only the files that can affect the image and calculates a
-   deterministic SHA-256 over their paths and contents.
-2. Uses that hash as the ACR tag and disables write/delete operations on the
-   resolved tag so its digest cannot be moved.
-3. Reuses the existing tag when the exact context was already built; otherwise
-   runs an Azure Container Registry quick build for Linux AMD64.
-4. Resolves the immutable image digest.
-5. Rotates a 30-day password for the read-only pull token.
-6. Creates or updates the Function App directly with:
-
-   ```text
-   functionAppConfig.deployment.storage.type = Registry
-   ```
-
-7. Pins the app to `registry/repository:tag@sha256:digest`.
-8. Restarts the app once.
-
-The worker download remains SHA-256 verified. The Dockerfile performs the
-verification in a `RUN` step after the remote `ADD`, which is compatible with
-ACR Tasks and still fails the build if the archive does not match.
-
-The token password and runtime storage connection string are passed as secure
-Bicep parameters. Neither value is committed, printed, emitted as a deployment
-output, or saved in the `azd` environment. Rerunning `azd provision` or
-`azd up` skips the remote build when the image inputs are unchanged, then
-rotates the 30-day registry credential and reapplies the digest-pinned app.
-
-### Create the environment
-
-Set the target subscription, standard resource location, and preview Function
-App display location explicitly because local `azd` defaults can point
-elsewhere:
-
-```powershell
-azd env new node-pdf-byoc --no-prompt
+```shell
+azd env new node-pdf-flex --no-prompt
 azd env set AZURE_SUBSCRIPTION_ID <subscription-id>
-azd env set AZURE_LOCATION northcentralus
-azd env set AZURE_FUNCTION_LOCATION "North Central US (Stage)"
+azd env set AZURE_LOCATION eastus2
+azd env set AZURE_FUNCTION_LOCATION eastus2euap
 ```
 
-Review the selected values:
+`AZURE_LOCATION` is used for storage, ACR, Log Analytics, and Application
+Insights. `AZURE_FUNCTION_LOCATION` is used for the FC1 plan and Function App.
+The split is required because Log Analytics isn't available in
+`eastus2euap`.
 
-```powershell
-azd env get-values
-```
+Provision the resources, build the container, deploy it, and verify the Hello
+and PDF endpoints:
 
-### Provision, build, deploy, and verify
-
-```powershell
+```shell
 azd up
 ```
 
-`azd up` performs the infrastructure deployment, ACR build or reuse, direct
-Registry Function App creation, and endpoint verification. The final hook
-verifies:
+For unattended execution, use `azd up --no-prompt` after all four environment
+values are set.
 
-- Azure inventories `Hello` and `HtmlToPdf`;
-- Hello GET and POST return the exact expected greeting;
-- deployment storage type is `Registry`;
-- the deployed image matches the immutable digest;
-- `FUNCTIONS_APPLICATION_DIRECTORY`, `AzureWebJobsScriptRoot`, and
-  `WEBSITE_RUN_FROM_PACKAGE` are absent;
-- PDF GET and POST return non-empty files beginning with `%PDF-` and ending
-  with `%%EOF`.
+The deployment creates the Function App directly with:
 
-Useful deployment values:
-
-```powershell
-azd env get-value API_URL
-azd env get-value AZURE_RESOURCE_GROUP
-azd env get-value AZURE_FUNCTION_NAME
-azd env get-value AZURE_REGISTRY_IMAGE
-azd env get-value AZURE_IMAGE_CONTEXT_HASH
-azd env get-value AZURE_IMAGE_BUILD_ACTION
-azd env get-value AZURE_VERIFIED_UTC
+```text
+functionAppConfig.deployment.storage.type = Registry
 ```
 
-### Deploy only image changes
+It doesn't create a code-deployed Function App and convert it afterward.
 
-After the environment has been provisioned once, use the image deployment
-script for the fast edit/build/repoint/verify loop. It does not rerun the
-foundation Bicep deployment:
+## Test the deployed container
+
+Get the deployed endpoint.
+
+PowerShell:
+
+```powershell
+$apiUrl = azd env get-value API_URL
+```
+
+Bash:
+
+```bash
+API_URL=$(azd env get-value API_URL)
+```
+
+Verify the Hello endpoint:
+
+PowerShell:
+
+```powershell
+curl.exe --fail --show-error "$apiUrl/api/hello"
+```
+
+Bash:
+
+```bash
+curl --fail --show-error "$API_URL/api/hello"
+```
+
+POST the included [`sample.html`](./sample.html).
+
+PowerShell:
+
+```powershell
+curl.exe --fail --show-error `
+  --request POST `
+  --header "Content-Type: text/html; charset=utf-8" `
+  --header "X-Pdf-Filename: node-flex-sample.pdf" `
+  --data-binary "@sample.html" `
+  --output document.pdf `
+  --write-out "HTTP %{http_code}; Content-Type %{content_type}; Bytes %{size_download}`n" `
+  "$apiUrl/api/html-to-pdf"
+```
+
+Bash:
+
+```bash
+curl --fail --show-error \
+  --request POST \
+  --header 'Content-Type: text/html; charset=utf-8' \
+  --header 'X-Pdf-Filename: node-flex-sample.pdf' \
+  --data-binary @sample.html \
+  --output document.pdf \
+  --write-out $'HTTP %{http_code}; Content-Type %{content_type}; Bytes %{size_download}\n' \
+  "$API_URL/api/html-to-pdf"
+```
+
+Expected output resembles:
+
+```text
+HTTP 200; Content-Type application/pdf; Bytes 20000
+```
+
+The byte count varies but must be greater than zero. Verify the PDF boundaries:
+
+```shell
+node -e "const fs=require('node:fs');const b=fs.readFileSync('document.pdf');if(b.subarray(0,5).toString('ascii')!=='%PDF-'||!/%%EOF\\s*$/.test(b.subarray(-128).toString('ascii')))throw new Error('Invalid PDF');console.log('Valid PDF: '+b.length+' bytes')"
+```
+
+Expected output:
+
+```text
+Valid PDF: <non-zero byte count> bytes
+```
+
+Open the generated PDF.
+
+Windows:
+
+```powershell
+Start-Process .\document.pdf
+```
+
+macOS:
+
+```bash
+open document.pdf
+```
+
+Linux:
+
+```bash
+xdg-open document.pdf
+```
+
+The displayed PDF should contain:
+
+- **Azure Functions HTML-to-PDF**
+- **Rendered with Puppeteer Core and system Chromium**
+- **This document is self-contained and doesn't load external resources.**
+
+You can also download the built-in invoice:
+
+```shell
+curl --fail --show-error "$API_URL/api/html-to-pdf" --output invoice.pdf
+```
+
+## Redeploy container changes
+
+This section isn't needed for the initial deployment. Use it later if you
+change the TypeScript source, Node dependencies, vendored compiler packages,
+or Dockerfile and want to deploy an updated container.
+
+Rerun `azd up`, or use the image-only workflow after the environment is
+provisioned:
+
+PowerShell:
 
 ```powershell
 .\infra\scripts\deployimage.ps1 -Verify
 ```
 
-On macOS or Linux:
+Bash:
 
-```sh
+```bash
 sh ./infra/scripts/deployimage.sh --verify
 ```
 
-The script stages the minimal context, computes its SHA-256 tag, and asks ACR
-whether that tag already exists. Changed image inputs trigger `az acr build`;
-unchanged inputs reuse the existing digest. The resolved tag is write/delete
-locked. Both paths rotate the scoped pull credential, update the
-Registry-backed Function App, restart it, and verify the Hello and PDF
-endpoints when `-Verify` or `--verify` is supplied.
+Unchanged image inputs reuse the existing digest.
 
-Omit the verification option when another command will run the post-deploy
-checks separately:
+## Security
 
-```powershell
-.\infra\scripts\deployimage.ps1
-```
+Rendering untrusted HTML invokes a complex browser parser. Before production
+use, add authentication, authorization, rate limiting, tenant isolation, abuse
+monitoring, and workload-specific HTML sanitization.
 
-### Verify manually
+This sample:
 
-```powershell
-$baseUrl = azd env get-value API_URL
+- uses anonymous HTTP triggers only to simplify the sample;
+- keeps ACR admin and anonymous pull disabled;
+- grants the Function App a repository-scoped read-only pull credential;
+- passes registry and storage secrets only as secure deployment parameters;
+- doesn't write those secrets to source or `azd` environment outputs;
+- runs the application and Chromium as the non-root `node` user;
+- keeps Chromium's sandbox enabled;
+- disables JavaScript and external subresources;
+- doesn't accept arbitrary URLs for server-side fetching;
+- bounds input, output, concurrency, and execution time.
 
-curl.exe -fS --max-time 120 `
-  "$baseUrl/api/hello"
+## Preview limitations
 
-curl.exe -fS --max-time 120 `
-  "$baseUrl/api/html-to-pdf" `
-  --output invoice.pdf
+- The direct Registry deployment uses preview Azure resource APIs.
+- Region and subscription enablement are required.
+- Storage and ACR use public service endpoints in this sample.
+- Runtime storage currently uses a connection string passed as a secure
+  deployment parameter.
+- The HTTP endpoints are anonymous.
+- The image is Linux AMD64 only.
 
-curl.exe -fS --max-time 120 `
-  -X POST `
-  -H "Content-Type: text/html; charset=utf-8" `
-  -H "X-Pdf-Filename: custom.pdf" `
-  --data-binary "@custom.html" `
-  "$baseUrl/api/html-to-pdf" `
-  --output custom.pdf
-```
+## Costs
 
-### Preview limitations
+The environment can incur charges for:
 
-- The Registry deployment contract uses `Microsoft.Web/sites@2026-08-01`.
-- The validated Function App and plan location is
-  `North Central US (Stage)`, while supporting resources use
-  `northcentralus`.
-- The Stage location currently rejects App Service managed identities. The
-  Function App therefore uses the storage account connection string, supplied
-  only as a secure Bicep parameter. Use managed identity instead when the
-  Registry contract is available in a location that supports site identities.
-- The image is worker-only. Azure supplies Functions Host and the worker
-  transport outside the image.
-- ACR and storage use public service endpoints for preview compatibility.
-  Storage anonymous blob access is disabled; registry pull access is
-  repository-scoped.
-- HTTP triggers remain anonymous for sample validation. Add authentication,
-  authorization, rate limiting, and abuse protection before production use.
+- Flex Consumption executions;
+- Azure Container Registry storage and ACR Tasks builds;
+- the storage account;
+- Log Analytics and Application Insights ingestion;
+- Chromium CPU time and cold starts.
 
-### Retained cost items
+## Clean up resources
 
-An active environment retains an FC1 plan/app, ACR, storage account, Log
-Analytics workspace, and Application Insights. ACR and monitoring can incur
-charges even when the Function App is idle.
+Review the selected environment:
 
-### Cleanup
-
-Review the environment before deleting it:
-
-```powershell
+```shell
 azd env get-values
-az resource list `
-  --resource-group (azd env get-value AZURE_RESOURCE_GROUP) `
-  --output table
 ```
 
-Delete the environment only when its retained resources are no longer needed:
+Delete the resource group and all resources created for that environment:
 
-```powershell
+```shell
 azd down --force
 ```
 
-This deletes the resource group created for the selected `azd` environment. It
-does not delete local source files.
+This command doesn't delete the local repository.
 
-### Troubleshooting
+## Resources
 
-- If the app does not index functions immediately, wait for the bounded
-  verification hook. It performs one clean restart after two minutes.
-- If an ACR build fails, open its run in ACR, review the quick-build log,
-  correct the Dockerfile or build inputs, and rerun the image deployment.
-- If an unchanged deployment unexpectedly rebuilds, compare
-  `AZURE_IMAGE_CONTEXT_HASH` and the staged input list in
-  `infra/scripts/imagecontext.mjs`.
-- If the Registry credential expires, rerun `azd provision` or `azd up` to
-  rotate it and repin the app.
-- If Azure Policy denies a resource, do not weaken the policy. Review the
-  failing assignment and adjust networking or resource settings.
-- Do not add `FUNCTIONS_APPLICATION_DIRECTORY` or
-  `AzureWebJobsScriptRoot`; worker 3.17.3 resolves `/home/site/wwwroot`
-  without either override.
+- [Azure Developer CLI](https://learn.microsoft.com/azure/developer/azure-developer-cli/)
+- [Run Azure Functions locally](https://learn.microsoft.com/azure/azure-functions/functions-run-local)
+- [Azure Functions Flex Consumption](https://learn.microsoft.com/azure/azure-functions/flex-consumption-plan)
+- [Azure Functions Node.js developer guide](https://learn.microsoft.com/azure/azure-functions/functions-reference-node)
+- [Azure Container Registry Tasks](https://learn.microsoft.com/azure/container-registry/container-registry-tasks-overview)
+- [Puppeteer](https://pptr.dev/)
 
 ## License
 
-MIT
+This sample is licensed under the [MIT License](LICENSE).

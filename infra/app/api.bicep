@@ -36,8 +36,8 @@ resource functionApp 'Microsoft.Web/sites@2026-08-01' = {
           value: registryImage
           authentication: {
             type: 'Basic'
-            usernameSettingName: 'BYOC_REGISTRY_USERNAME'
-            passwordSettingName: 'BYOC_REGISTRY_PASSWORD'
+            usernameSettingName: 'FLEX_CONTAINER_REGISTRY_USERNAME'
+            passwordSettingName: 'FLEX_CONTAINER_REGISTRY_PASSWORD'
           }
         }
       }
@@ -66,11 +66,11 @@ resource functionApp 'Microsoft.Web/sites@2026-08-01' = {
           value: storageConnectionString
         }
         {
-          name: 'BYOC_REGISTRY_PASSWORD'
+          name: 'FLEX_CONTAINER_REGISTRY_PASSWORD'
           value: registryPassword
         }
         {
-          name: 'BYOC_REGISTRY_USERNAME'
+          name: 'FLEX_CONTAINER_REGISTRY_USERNAME'
           value: registryUsername
         }
         {

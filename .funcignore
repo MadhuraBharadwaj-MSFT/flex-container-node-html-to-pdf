@@ -2,7 +2,6 @@
 .github/
 .azure/
 infra/
-javascript/
 src/
 test/
 vendor/

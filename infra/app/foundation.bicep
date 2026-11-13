@@ -66,6 +66,8 @@ resource applicationInsights 'Microsoft.Insights/components@2020-02-02' = {
   properties: {
     Application_Type: 'web'
     DisableLocalAuth: false
+    Flow_Type: 'Bluefield'
+    Request_Source: 'rest'
     WorkspaceResourceId: logAnalytics.id
   }
 }
@@ -81,6 +83,9 @@ resource containerRegistry 'Microsoft.ContainerRegistry/registries@2025-04-01' =
     adminUserEnabled: false
     anonymousPullEnabled: false
     dataEndpointEnabled: false
+    encryption: {
+      status: 'disabled'
+    }
     publicNetworkAccess: 'Enabled'
   }
 }

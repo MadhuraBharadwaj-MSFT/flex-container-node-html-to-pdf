@@ -220,7 +220,7 @@ try {
     & azd env set API_URL "https://$functionAppName.azurewebsites.net" --no-prompt |
         Out-Null
 
-    & az functionapp restart `
+    & az functionapp start `
         --resource-group $resourceGroup `
         --name $functionAppName `
         --only-show-errors

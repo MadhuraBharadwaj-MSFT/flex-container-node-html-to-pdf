@@ -1,5 +1,7 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
+const fs = require('node:fs');
+const path = require('node:path');
 const {
     CHROMIUM_ARGS,
     MAX_HTML_BYTES,
@@ -156,6 +158,18 @@ test('oversized POST is rejected as a client warning', async () => {
 
 test('default invoice contains no external resource references or scripts', () => {
     const html = defaultInvoiceHtml();
+    assert.doesNotMatch(html, /<script/i);
+    assert.doesNotMatch(html, /\b(?:src|href)\s*=\s*["']https?:/i);
+});
+
+test('documented sample HTML is bounded and self-contained', () => {
+    const html = fs.readFileSync(
+        path.resolve(__dirname, '..', 'sample.html'),
+        'utf8',
+    );
+
+    assert.ok(Buffer.byteLength(html, 'utf8') <= MAX_HTML_BYTES);
+    assert.match(html, /Azure Functions HTML-to-PDF/);
     assert.doesNotMatch(html, /<script/i);
     assert.doesNotMatch(html, /\b(?:src|href)\s*=\s*["']https?:/i);
 });

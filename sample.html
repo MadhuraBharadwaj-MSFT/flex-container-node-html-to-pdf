@@ -1,0 +1,38 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Azure Functions HTML-to-PDF</title>
+  <style>
+    @page { size: A4; margin: 24mm; }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      color: #172033;
+      font-family: "DejaVu Sans", "Liberation Sans", Arial, sans-serif;
+    }
+    main {
+      border: 2px solid #0969da;
+      border-radius: 16px;
+      padding: 32px;
+    }
+    h1 { margin-top: 0; color: #0969da; }
+    .note {
+      margin-top: 24px;
+      padding: 16px;
+      border-radius: 10px;
+      background: #ddf4ff;
+    }
+  </style>
+</head>
+<body>
+  <main>
+    <h1>Azure Functions HTML-to-PDF</h1>
+    <p>Rendered with Puppeteer Core and system Chromium.</p>
+    <div class="note">
+      This document is self-contained and doesn't load external resources.
+    </div>
+  </main>
+</body>
+</html>

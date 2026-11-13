@@ -88,16 +88,28 @@ if ($helloPost.StatusCode -ne 200 -or
     throw 'The Hello POST response did not match the expected oracle.'
 }
 
-$functionNames = @(
-    & az rest `
-        --method get `
-        --url "https://management.azure.com$siteId/functions?api-version=2026-08-01" `
-        --query 'value[].name' `
-        --output tsv
-)
-if (-not ($functionNames -match '(^|/)Hello$') -or
+$inventoryDeadline = [DateTime]::UtcNow.AddMinutes(2)
+$functionNames = @()
+do {
+    $functionNames = @(
+        & az rest `
+            --method get `
+            --url "https://management.azure.com$siteId/functions?api-version=2026-08-01" `
+            --query 'value[].name' `
+            --output tsv
+    )
+    if ($functionNames.Count -eq 2 -and
+        $functionNames -match '(^|/)Hello$' -and
+        $functionNames -match '(^|/)HtmlToPdf$') {
+        break
+    }
+    Start-Sleep -Seconds 5
+} while ([DateTime]::UtcNow -lt $inventoryDeadline)
+
+if ($functionNames.Count -ne 2 -or
+    -not ($functionNames -match '(^|/)Hello$') -or
     -not ($functionNames -match '(^|/)HtmlToPdf$')) {
-    throw "Azure did not inventory both Hello and HtmlToPdf: $functionNames"
+    throw "Azure did not inventory only Hello and HtmlToPdf: $functionNames"
 }
 
 $deployment = & az rest `
